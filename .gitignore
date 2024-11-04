@@ -1,0 +1,10 @@
+# STM32CubeIDE specific directories and files
+# .stm32cubemx/            # CubeMX auto-generated configuration
+# .cproject                # Eclipse CDT project file
+# .project                 # Eclipse project settings file
+.settings/               # Eclipse settings folder
+.metadata/               # Workspace metadata (if committed accidentally)
+.loadpath                # Eclipse CDT specific
+STM32F4_Ultrasonic/Documentation/Documentation.7z
+/STM32F4_Ultrasonic/Debug
+/STM32F4_Ultrasonic/.settings
