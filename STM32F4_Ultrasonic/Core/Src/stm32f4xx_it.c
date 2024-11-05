@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file    stm32f4xx_it.c
-  * @brief   Interrupt Service Routines.
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2024 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    stm32f4xx_it.c
+ * @brief   Interrupt Service Routines.
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2024 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -73,9 +73,8 @@ void NMI_Handler(void)
 
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
-   while (1)
-  {
-  }
+    while (1) {
+    }
   /* USER CODE END NonMaskableInt_IRQn 1 */
 }
 
@@ -184,8 +183,8 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-	extern uint64_t UserTick;
-	UserTick++;
+    extern uint64_t UserTick;
+    UserTick++;
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
@@ -209,28 +208,41 @@ void TIM2_IRQHandler(void)
 
   /* USER CODE END TIM2_IRQn 0 */
   /* USER CODE BEGIN TIM2_IRQn 1 */
-	LL_TIM_ClearFlag_UPDATE(TIM2);
+    LL_TIM_ClearFlag_UPDATE(TIM2);
 
-	// UIF Flag sauber machen.
-	if (TriggerSignalGPIOState == LOW)
-	{/* set Trigger Signal HIGH */
-		LL_GPIO_SetOutputPin(PB7_TRIG_OUT_GPIO_Port, PB7_TRIG_OUT_Pin);
-		TriggerSignalGPIOState = HIGH;
-	}
-	else if (TriggerSignalGPIOState == HIGH)
-	{
-		NVIC_DisableIRQ(TIM2_IRQn);
-		NVIC_ClearPendingIRQ(TIM2_IRQn);
-		LL_TIM_DisableCounter(TIM2);
-
-	}
-
-
-//	LL_TIM_SetCounter(TIM2, (uint32_t) 0x00);
-//	LL_TIM_EnableCounter(TIM2);
-
-//	NVIC_EnableIRQ(TIM2_IRQn);
+    // UIF Flag sauber machen.
+    if (TriggerSignalGPIOState == LOW) {/* set Trigger Signal HIGH */
+        LL_GPIO_SetOutputPin(PB7_TRIG_OUT_GPIO_Port, PB7_TRIG_OUT_Pin);
+        TriggerSignalGPIOState = HIGH;
+    } else if (TriggerSignalGPIOState == HIGH) {
+        NVIC_DisableIRQ(TIM2_IRQn);
+        NVIC_ClearPendingIRQ(TIM2_IRQn);
+        LL_TIM_DisableCounter(TIM2);
+        LL_TIM_DisableIT_UPDATE(TIM2);
+        LL_TIM_SetCounter(TIM2, (uint32_t) 0x00);
+        LL_GPIO_ResetOutputPin(PB7_TRIG_OUT_GPIO_Port, PB7_TRIG_OUT_Pin);
+        TriggerSignalGPIOState = LOW;
+        NVIC_EnableIRQ(TIM2_IRQn);
+    }
   /* USER CODE END TIM2_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM3 global interrupt.
+  */
+void TIM3_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM3_IRQn 0 */
+    LL_TIM_ClearFlag_UPDATE(TIM3);
+    LL_TIM_DisableCounter(TIM3);
+    LL_TIM_DisableIT_UPDATE(TIM3);
+    LL_TIM_SetCounter(TIM3, (uint32_t) 0x00);
+    LL_TIM_EnableIT_UPDATE(TIM3);
+    LL_TIM_EnableCounter(TIM3);
+  /* USER CODE END TIM3_IRQn 0 */
+  /* USER CODE BEGIN TIM3_IRQn 1 */
+
+  /* USER CODE END TIM3_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
@@ -241,15 +253,29 @@ void TIM2_IRQHandler(void)
 //.word     EXTI4_IRQHandler                  /* EXTI Line4
 //.word     EXTI9_5_IRQHandler                /* External Line[9:5]s
 //.word     EXTI15_10_IRQHandler              /* External Line[15:10]s
-
+#define RISING_EDGE     1
+#define FALLING_EDGE    0
 void EXTI4_IRQHandler(void)
 {
+    // Check if EXTI line 4 caused the interrupt
+    if(LL_EXTI_IsActiveFlag_0_31(LL_EXTI_LINE_4))
+    {
+        LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_4);
+    }
 
+    *pEchoEdges++ = LL_TIM_GetCounter(TIM3);
+    static uint8_t edge = RISING_EDGE;
 
+    /* after measuring rising EDGE, measure falling EDGE */
+    if (edge == FALLING_EDGE)
+    {
+        EchoState = ECHO_RECEIVED;
+        edge = RISING_EDGE;
+        pEchoEdges = &EchoEdges[0];
+        return;
+    }
 
-
-
+    edge = FALLING_EDGE;
 }
-
 
 /* USER CODE END 1 */

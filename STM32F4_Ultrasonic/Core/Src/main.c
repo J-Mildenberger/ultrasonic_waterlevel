@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2024 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2024 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -49,6 +49,7 @@
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -56,12 +57,30 @@ static void MX_TIM2_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-
 uint64_t UserTick = 0;
 uint64_t UserTick_old = 0;
 
-
 void PulseFunc(void);
+
+
+#ifdef DEBUG
+typedef struct
+{
+  uint32_t timer;
+  MeasurementState_t MeasState;
+} dbg_t;
+
+dbg_t buff_dbg[32];
+dbg_t *pbuff_dbg = &buff_dbg[0];
+
+#define DBG_TRACE  {pbuff_dbg->MeasState = MeasurementState;\
+    pbuff_dbg->timer = LL_TIM_GetCounter(TIM3);\
+    pbuff_dbg++;\
+    if (pbuff_dbg == &buff_dbg[31]){pbuff_dbg = &buff_dbg[0];}}
+
+
+#endif
+
 
 /* USER CODE END 0 */
 
@@ -95,47 +114,62 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM2_Init();
-
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-
-
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  MeasurementState = IDLE;
+    MeasurementState = IDLE;
 
-
-  while (1)
-  {
+    while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	HAL_Delay(100);
-	if (MeasurementState == FINISHED)
-	{
-		UserTick_old = UserTick;
-		MeasurementState = IDLE;
-	}
-	if (MeasurementState == IDLE)
-	{
-		if ((UserTick - UserTick_old) >= WAIT_TIME_NEXT_MEAS)
-		{
-			MeasurementState = STARTED;
-			PulseFunc_FSM(); // #TODO Start TIM OnePulseMode */
-			//TIMer starten für Echo Messung
-		}
-	}
-	if (MeasurementState == STARTED)
-	{
-		/* Echo Signal handled @EXTI ISR */
-		// get Rising Edge TIMER Value
-		// get Falling Edge TIMER Value
-		// Subtrahieren und Messobjekt Distanz rausrechnen.
-	}
+        HAL_Delay(100);
+        if (MeasurementState == FINISHED) {
+            UserTick_old = UserTick;
+            MeasurementState = IDLE;
+            DBG_TRACE;
+        }
+        else if (MeasurementState == IDLE) {
+            DBG_TRACE;
+            if ((UserTick - UserTick_old) >= WAIT_TIME_NEXT_MEAS) {
+                MeasurementState = STARTED;
+                DBG_TRACE;
+            }
+        }
+        else if (MeasurementState == STARTED) {
 
-  }
+            MeasurementState = ONGOING;
+            //PulseFunc_FSM(); // #TODO Start TIM OnePulseMode */
+            DBG_TRACE;
+            /* enable TIM2 IRQ */
+            LL_TIM_EnableIT_UPDATE(TIM2);
+            LL_TIM_EnableCounter(TIM2);
+            //#TODO TIMer starten für Echo Messung
+        }
+        else if (MeasurementState == ONGOING) {
+            /* Echo Signal handled @EXTI ISR */
+            // get Rising Edge TIMER Value
+            // get Falling Edge TIMER Value
+            // Subtrahieren und Messobjekt Distanz rausrechnen.
+            DBG_TRACE;
+            if (EchoState == ECHO_RECEIVED)
+            {
+
+
+                AJSR04_CalcDistanceEcho(&EchoEdges[0],&EchoEdges[1]);
+                MeasurementState = FINISHED;
+                DBG_TRACE;
+            }
+
+
+
+        }
+
+    }
   /* USER CODE END 3 */
 }
 
@@ -221,6 +255,46 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  LL_TIM_InitTypeDef TIM_InitStruct = {0};
+
+  /* Peripheral clock enable */
+  LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM3);
+
+  /* TIM3 interrupt Init */
+  NVIC_SetPriority(TIM3_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
+  NVIC_EnableIRQ(TIM3_IRQn);
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  TIM_InitStruct.Prescaler = 1599;
+  TIM_InitStruct.CounterMode = LL_TIM_COUNTERMODE_UP;
+  TIM_InitStruct.Autoreload = 65535;
+  TIM_InitStruct.ClockDivision = LL_TIM_CLOCKDIVISION_DIV1;
+  LL_TIM_Init(TIM3, &TIM_InitStruct);
+  LL_TIM_EnableARRPreload(TIM3);
+  LL_TIM_SetClockSource(TIM3, LL_TIM_CLOCKSOURCE_INTERNAL);
+  LL_TIM_SetTriggerOutput(TIM3, LL_TIM_TRGO_UPDATE);
+  LL_TIM_DisableMasterSlaveMode(TIM3);
+  /* USER CODE BEGIN TIM3_Init 2 */
+  LL_TIM_EnableIT_UPDATE(TIM3);
+  LL_TIM_EnableCounter(TIM3);
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -249,7 +323,7 @@ static void MX_GPIO_Init(void)
   LL_EXTI_Init(&EXTI_InitStruct);
 
   /**/
-  LL_GPIO_SetPinPull(PB4_ECHO_IN_GPIO_Port, PB4_ECHO_IN_Pin, LL_GPIO_PULL_DOWN);
+  LL_GPIO_SetPinPull(PB4_ECHO_IN_GPIO_Port, PB4_ECHO_IN_Pin, LL_GPIO_PULL_NO);
 
   /**/
   LL_GPIO_SetPinMode(PB4_ECHO_IN_GPIO_Port, PB4_ECHO_IN_Pin, LL_GPIO_MODE_INPUT);
@@ -263,15 +337,13 @@ static void MX_GPIO_Init(void)
   LL_GPIO_Init(PB7_TRIG_OUT_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
+  /* EXTI interrupt init*/
+  NVIC_SetPriority(EXTI4_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
+  NVIC_EnableIRQ(EXTI4_IRQn);
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-
-
-
-
-
 
 /* USER CODE END 4 */
 
@@ -282,11 +354,10 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+    /* User can add his own implementation to report the HAL error return state */
+    __disable_irq();
+    while (1) {
+    }
   /* USER CODE END Error_Handler_Debug */
 }
 

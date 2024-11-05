@@ -7,41 +7,23 @@
 
 #include "Ultrasonic_AJSR04.h"
 
-
-
+EchoState_t EchoState = ECHO_IDLE;
 MeasurementState_t MeasurementState = IDLE;
 TriggerSignalGPIOState_t TriggerSignalGPIOState = LOW;
 
-
-
-void AJSR04_Init(void)
+uint32_t EchoEdges[2] = {0,0};
+uint32_t *pEchoEdges = &EchoEdges[0];
+void AJSR04_Reset(void)
 {
-//	MeasurementState_t UltraSonicState = IDLE;
-//	TriggerSignalGPIOState_t TriggerSignalGPIOState = LOW;
-	MeasurementState = IDLE;
-	TriggerSignalGPIOState = LOW;
+    MeasurementState = IDLE;
+    TriggerSignalGPIOState = LOW;
+    EchoState = ECHO_IDLE;
+}
 
-
+uint32_t AJSR04_CalcDistanceEcho(uint32_t * risingEdge, uint32_t * fallingEdge)
+{
+    uint32_t diff = ((*fallingEdge) - (*risingEdge));
+    return diff;
 }
 
 
-void PulseFunc_FSM(void)
-{
-
-	if (TriggerSignalGPIOState == LOW)
-	{
-		/* enable TIM2 IRQ */
-		LL_TIM_EnableIT_UPDATE(TIM2);
-		LL_TIM_EnableCounter(TIM2);
-
-		return;
-	}
-	if (TriggerSignalGPIOState == HIGH)
-	{
-		TriggerSignalGPIOState = LOW;
-		/* set Trigger Signal LOW */
-		LL_GPIO_ResetOutputPin(PB7_TRIG_OUT_GPIO_Port, PB7_TRIG_OUT_Pin);
-		LL_TIM_DisableCounter(TIM2);
-		return;
-	}
-}
