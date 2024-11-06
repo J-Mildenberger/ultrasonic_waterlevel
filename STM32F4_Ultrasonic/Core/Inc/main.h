@@ -69,6 +69,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define PB4_ECHO_IN_Pin LL_GPIO_PIN_4
 #define PB4_ECHO_IN_GPIO_Port GPIOB
+#define PB6_DBG_TRIG_Pin LL_GPIO_PIN_6
+#define PB6_DBG_TRIG_GPIO_Port GPIOB
 #define PB7_TRIG_OUT_Pin LL_GPIO_PIN_7
 #define PB7_TRIG_OUT_GPIO_Port GPIOB
 
